@@ -1,222 +1,234 @@
 #![allow(dead_code)]
 #![allow(non_snake_case)]
+#![allow(non_upper_case_globals)]
 
-pub struct BitField(u8, u8);
+/// Store the (`width`, `offst`) of the BitField.
+#[derive(Copy, Clone, Debug, Default)]
+pub struct BitField(pub u8, pub u8);
 
-trait BitFieldOps<T> {
+/// Read and Write the value of the BitField.
+pub trait BitFieldOps<T> {
     fn get(&self, target: T) -> T;
     fn set(&self, target: &mut T, value: T);
 }
 
-trait BitFields {
+/// Return the BitField descriptor(s).
+pub trait BitFields {
     fn field(&self, index: usize) -> &'static BitField;
     fn fields(&self) -> &'static [BitField];
 }
 
+/// Helpers for the BitField.
 impl BitField {
-    #[inline]
-    fn new(width: u8, offset: u8) -> Self {
+    pub fn new(width: u8, offset: u8) -> Self {
         Self {
             0: width,
             1: offset,
         }
     }
 
-    #[inline]
-    fn mask_u8(&self) -> u8 {
+    pub fn mask_u8(self) -> u8 {
         match self.0 {
-            0..=7 => (1u8.wrapping_shl(self.0 as u32) - 1).wrapping_shl(self.1 as u32),
+            0..=7 => (1u8.wrapping_shl(u32::from(self.0)) - 1).wrapping_shl(u32::from(self.1)),
             _ => 0xffu8,
         }
     }
 
-    #[inline]
-    fn mask_u16(&self) -> u16 {
+    pub fn mask_u16(self) -> u16 {
         match self.0 {
-            0..=15 => (1u16.wrapping_shl(self.0 as u32) - 1).wrapping_shl(self.1 as u32),
+            0..=15 => (1u16.wrapping_shl(u32::from(self.0)) - 1).wrapping_shl(u32::from(self.1)),
             _ => 0xffffu16,
         }
     }
 
-    #[inline]
-    fn mask_u32(&self) -> u32 {
+    pub fn mask_u32(self) -> u32 {
         match self.0 {
-            0..=31 => (1u32.wrapping_shl(self.0 as u32) - 1).wrapping_shl(self.1 as u32),
+            0..=31 => (1u32.wrapping_shl(u32::from(self.0)) - 1).wrapping_shl(u32::from(self.1)),
             _ => 0xffff_ffffu32,
         }
     }
 
-    #[inline]
-    fn mask_u64(&self) -> u64 {
+    pub fn mask_u64(self) -> u64 {
         match self.0 {
-            0..=63 => (1u64.wrapping_shl(self.0 as u32) - 1).wrapping_shl(self.1 as u32),
+            0..=63 => (1u64.wrapping_shl(u32::from(self.0)) - 1).wrapping_shl(u32::from(self.1)),
             _ => 0xffff_ffff_ffff_ffffu64,
         }
     }
 }
 
 impl BitFieldOps<u8> for BitField {
-    #[inline]
     fn get(&self, target: u8) -> u8 {
         (target & self.mask_u8()) >> self.1
     }
 
-    #[inline]
     fn set(&self, target: &mut u8, value: u8) {
         *target = (*target & !self.mask_u8()) | ((value << self.1) & self.mask_u8())
     }
 }
 
 impl BitFieldOps<u16> for BitField {
-    #[inline]
     fn get(&self, target: u16) -> u16 {
         (target & self.mask_u16()) >> self.1
     }
 
-    #[inline]
     fn set(&self, target: &mut u16, value: u16) {
         *target = (*target & !self.mask_u16()) | ((value << self.1) & self.mask_u16())
     }
 }
 
 impl BitFieldOps<u32> for BitField {
-    #[inline]
     fn get(&self, target: u32) -> u32 {
         (target & self.mask_u32()) >> self.1
     }
 
-    #[inline]
     fn set(&self, target: &mut u32, value: u32) {
         *target = (*target & !self.mask_u32()) | ((value << self.1) & self.mask_u32())
     }
 }
 
 impl BitFieldOps<u64> for BitField {
-    #[inline]
     fn get(&self, target: u64) -> u64 {
         (target & self.mask_u64()) >> self.1
     }
 
-    #[inline]
     fn set(&self, target: &mut u64, value: u64) {
         *target = (*target & !self.mask_u64()) | ((value << self.1) & self.mask_u64())
     }
 }
 
-#[allow(unused_macros)]
-macro_rules! all_fn {
+/// Define the `all`, `clear`, `fill` Helpers.
+#[macro_export]
+macro_rules! bf_acf {
     ($DataType:ty) => {
-        #[inline]
         pub fn all(&self) -> $DataType { self.0 }
         pub fn clear(&mut self) -> &mut Self { self.0 = 0; self }
         pub fn fill(&mut self, value: $DataType) -> &mut Self { self.0 = value; self }
     }
 }
 
-#[allow(unused_macros)]
-macro_rules! decl_fields {
-    ($w0:expr, $w1:expr) => {
-        static MYFIELDS: &'static [BitField] = &[BitField($w0, 0), BitField($w1, $w0)];
+/// Define the BitField descriptors.
+#[macro_export]
+macro_rules! bf_cfa {
+    ($TypeName:ident, [$w0:expr, $w1:expr]) => {
+        paste::item! {
+            const [<$TypeName _BFS>]: &'static [BitField; 2usize] = &[
+                BitField($w0, 0),
+                BitField($w1, $w0)
+            ];
+        }
     };
 
-    ($w0:expr, $w1:expr, $w2:expr) => {
-        static MYFIELDS: &'static [BitField] = &[
-            BitField($w0, 0),
-            BitField($w1, $w0),
-            BitField($w2, $w1 + $w0),
-        ];
+    ($TypeName:ident, [$w0:expr, $w1:expr, $w2:expr]) => {
+        paste::item! {
+            const [<$TypeName _BFS>]: &'static [BitField; 3usize] = &[
+                BitField($w0, 0),
+                BitField($w1, $w0),
+                BitField($w2, $w1 + $w0),
+            ];
+        }
     };
 
-    ($w0:expr, $w1:expr, $w2:expr, $w3:expr) => {
-        static MYFIELDS: &'static [BitField] = &[
-            BitField($w0, 0),
-            BitField($w1, $w0),
-            BitField($w2, $w1 + $w0),
-            BitField($w3, $w2 + $w1 + $w0),
-        ];
+    ($TypeName:ident, [$w0:expr, $w1:expr, $w2:expr, $w3:expr]) => {
+        paste::item! {
+            const [<$TypeName _BFS>]: &'static [BitField; 4usize] = &[
+                BitField($w0, 0),
+                BitField($w1, $w0),
+                BitField($w2, $w1 + $w0),
+                BitField($w3, $w2 + $w1 + $w0),
+            ];
+        }
     };
 
-    ($w0:expr, $w1:expr, $w2:expr, $w3:expr, $w4:expr) => {
-        static MYFIELDS: &'static [BitField] = &[
-            BitField($w0, 0),
-            BitField($w1, $w0),
-            BitField($w2, $w1 + $w0),
-            BitField($w3, $w2 + $w1 + $w0),
-            BitField($w4, $w3 + $w2 + $w1 + $w0),
-        ];
+    ($TypeName:ident, [$w0:expr, $w1:expr, $w2:expr, $w3:expr, $w4:expr]) => {
+        paste::item! {
+            const [<$TypeName _BFS>]: &'static [BitField; 5usize] = &[
+                BitField($w0, 0),
+                BitField($w1, $w0),
+                BitField($w2, $w1 + $w0),
+                BitField($w3, $w2 + $w1 + $w0),
+                BitField($w4, $w3 + $w2 + $w1 + $w0),
+            ];
+        }
     };
 
-    ($w0:expr, $w1:expr, $w2:expr, $w3:expr, $w4:expr, $w5:expr) => {
-        static MYFIELDS: &'static [BitField] = &[
-            BitField($w0, 0),
-            BitField($w1, $w0),
-            BitField($w2, $w1 + $w0),
-            BitField($w3, $w2 + $w1 + $w0),
-            BitField($w4, $w3 + $w2 + $w1 + $w0),
-            BitField($w5, $w4 + $w3 + $w2 + $w1 + $w0),
-        ];
+    ($TypeName:ident, [$w0:expr, $w1:expr, $w2:expr, $w3:expr, $w4:expr, $w5:expr]) => {
+        paste::item! {
+            const [<$TypeName _BFS>]: &'static [BitField; 6usize] = &[
+                BitField($w0, 0),
+                BitField($w1, $w0),
+                BitField($w2, $w1 + $w0),
+                BitField($w3, $w2 + $w1 + $w0),
+                BitField($w4, $w3 + $w2 + $w1 + $w0),
+                BitField($w5, $w4 + $w3 + $w2 + $w1 + $w0),
+            ];
+        }
     };
 
-    ($w0:expr, $w1:expr, $w2:expr, $w3:expr, $w4:expr, $w5:expr, $w6:expr) => {
-        static MYFIELDS: &'static [BitField] = &[
-            BitField($w0, 0),
-            BitField($w1, $w0),
-            BitField($w2, $w1 + $w0),
-            BitField($w3, $w2 + $w1 + $w0),
-            BitField($w4, $w3 + $w2 + $w1 + $w0),
-            BitField($w5, $w4 + $w3 + $w2 + $w1 + $w0),
-            BitField($w6, $w5 + $w4 + $w3 + $w2 + $w1 + $w0),
-        ];
+    ($TypeName:ident, [$w0:expr, $w1:expr, $w2:expr, $w3:expr, $w4:expr, $w5:expr, $w6:expr]) => {
+        paste::item! {
+            const [<$TypeName _BFS>]: &'static [BitField; 7usize] = &[
+                BitField($w0, 0),
+                BitField($w1, $w0),
+                BitField($w2, $w1 + $w0),
+                BitField($w3, $w2 + $w1 + $w0),
+                BitField($w4, $w3 + $w2 + $w1 + $w0),
+                BitField($w5, $w4 + $w3 + $w2 + $w1 + $w0),
+                BitField($w6, $w5 + $w4 + $w3 + $w2 + $w1 + $w0),
+            ];
+        }
     };
 
-    ($w0:expr, $w1:expr, $w2:expr, $w3:expr, $w4:expr, $w5:expr, $w6:expr, $w7:expr) => {
-        static MYFIELDS: &'static [BitField] = &[
-            BitField($w0, 0),
-            BitField($w1, $w0),
-            BitField($w2, $w1 + $w0),
-            BitField($w3, $w2 + +w1 + $w0),
-            BitField($w4, $w3 + $w2 + $w1 + $w0),
-            BitField($w5, $w4 + $w3 + $w2 + $w1 + $w0),
-            BitField($w6, $w5 + $w4 + $w3 + $w2 + $w1 + $w0),
-            BitField($w7, $w6 + $w5 + $w4 + $w3 + $w2 + $w1 + $w0),
-        ];
+    ($TypeName:ident, [$w0:expr, $w1:expr, $w2:expr, $w3:expr, $w4:expr, $w5:expr, $w6:expr, $w7:expr]) => {
+        paste::item! {
+            const [<$TypeName _BFS>]: &'static [BitField; 8usize] = &[
+                BitField($w0, 0),
+                BitField($w1, $w0),
+                BitField($w2, $w1 + $w0),
+                BitField($w3, $w2 + +w1 + $w0),
+                BitField($w4, $w3 + $w2 + $w1 + $w0),
+                BitField($w5, $w4 + $w3 + $w2 + $w1 + $w0),
+                BitField($w6, $w5 + $w4 + $w3 + $w2 + $w1 + $w0),
+                BitField($w7, $w6 + $w5 + $w4 + $w3 + $w2 + $w1 + $w0),
+            ];
+        }
     };
 }
 
-#[allow(unused_macros)]
-macro_rules! decl_type {
+/// Define the Type Alias of the BitField.
+#[macro_export]
+macro_rules! bf_type {
     ($TypeName:ident, $DataType:ty) => {
         #[repr(C)]
+        #[derive(Copy, Clone, Debug, Default)]
         pub struct $TypeName($DataType);
     };
 }
 
-#[allow(unused_macros)]
-macro_rules! impl_fields {
-    ($TypeName:ident, [$($p:expr),*]) => {
-        impl BitFields for $TypeName {
-            #[inline]
-            fn field(&self, index: usize) -> &'static BitField {
-                &self.fields()[index]
-            }
-            #[inline]
-            fn fields(&self) -> &'static [BitField] {
-                decl_fields!($($p),*);
-                MYFIELDS
+/// Return the BitField descriptor(s) implements.
+#[macro_export]
+macro_rules! bf_ff {
+    ($TypeName:ident) => {
+        paste::item! {
+            impl BitFields for $TypeName {
+                fn field(&self, index: usize) -> &'static BitField {
+                    &self.fields()[index]
+                }
+                fn fields(&self) -> &'static [BitField] {
+                    [<$TypeName _BFS>]
+                }
             }
         }
     };
 }
 
-#[allow(unused_macros)]
-macro_rules! get_set_fn {
+/// Define the `getter` and `setter` function of the BitField.
+#[macro_export]
+macro_rules! bf_gsf {
     ($DataType:ty, $F:ident, $TypeName:expr) => {
         paste::item! {
-            #[inline]
             pub fn $F(&self) -> $DataType {
                 self.field($TypeName).get(self.0) as $DataType
             }
-            #[inline]
             pub fn [<set_ $F>](&mut self, value: $DataType) -> &mut Self {
                 self.field($TypeName).set(&mut self.0, value);
                 self
@@ -225,116 +237,125 @@ macro_rules! get_set_fn {
     };
 }
 
-#[allow(unused_macros)]
-macro_rules! impl_getter_setter {
+/// Implement the operations of the aliased Type.
+#[macro_export]
+macro_rules! bf_impl {
     ($TypeName:ident, $DataType:ty, [$f0:ident, $f1:ident]) => {
         impl $TypeName {
-            all_fn!($DataType);
-            get_set_fn!($DataType, $f0, 0);
-            get_set_fn!($DataType, $f1, 1);
+            bf_acf!($DataType);
+            bf_gsf!($DataType, $f0, 0);
+            bf_gsf!($DataType, $f1, 1);
         }
     };
     ($TypeName:ident, $DataType:ty, [$f0:ident, $f1:ident, $f2:ident]) => {
         impl $TypeName {
-            all_fn!($DataType);
-            get_set_fn!($DataType, $f0, 0);
-            get_set_fn!($DataType, $f1, 1);
-            get_set_fn!($DataType, $f2, 2);
+            bf_acf!($DataType);
+            bf_gsf!($DataType, $f0, 0);
+            bf_gsf!($DataType, $f1, 1);
+            bf_gsf!($DataType, $f2, 2);
         }
     };
     ($TypeName:ident, $DataType:ty, [$f0:ident, $f1:ident, $f2:ident, $f3:ident]) => {
         impl $TypeName {
-            all_fn!($DataType);
-            get_set_fn!($DataType, $f0, 0);
-            get_set_fn!($DataType, $f1, 1);
-            get_set_fn!($DataType, $f2, 2);
-            get_set_fn!($DataType, $f3, 3);
+            bf_acf!($DataType);
+            bf_gsf!($DataType, $f0, 0);
+            bf_gsf!($DataType, $f1, 1);
+            bf_gsf!($DataType, $f2, 2);
+            bf_gsf!($DataType, $f3, 3);
         }
     };
     ($TypeName:ident, $DataType:ty, [$f0:ident, $f1:ident, $f2:ident, $f3:ident, $f4:ident]) => {
         impl $TypeName {
-            all_fn!($DataType);
-            get_set_fn!($DataType, $f0, 0);
-            get_set_fn!($DataType, $f1, 1);
-            get_set_fn!($DataType, $f2, 2);
-            get_set_fn!($DataType, $f3, 3);
-            get_set_fn!($DataType, $f4, 4);
+            bf_acf!($DataType);
+            bf_gsf!($DataType, $f0, 0);
+            bf_gsf!($DataType, $f1, 1);
+            bf_gsf!($DataType, $f2, 2);
+            bf_gsf!($DataType, $f3, 3);
+            bf_gsf!($DataType, $f4, 4);
         }
     };
     ($TypeName:ident, $DataType:ty, [$f0:ident, $f1:ident, $f2:ident, $f3:ident, $f4:ident, $f5:ident]) => {
         impl $TypeName {
-            all_fn!($DataType);
-            get_set_fn!($DataType, $f0, 0);
-            get_set_fn!($DataType, $f1, 1);
-            get_set_fn!($DataType, $f2, 2);
-            get_set_fn!($DataType, $f3, 3);
-            get_set_fn!($DataType, $f4, 4);
-            get_set_fn!($DataType, $f5, 5);
+            bf_acf!($DataType);
+            bf_gsf!($DataType, $f0, 0);
+            bf_gsf!($DataType, $f1, 1);
+            bf_gsf!($DataType, $f2, 2);
+            bf_gsf!($DataType, $f3, 3);
+            bf_gsf!($DataType, $f4, 4);
+            bf_gsf!($DataType, $f5, 5);
         }
     };
     ($TypeName:ident, $DataType:ty, [$f0:ident, $f1:ident, $f2:ident, $f3:ident, $f4:ident, $f5:ident, $f6:ident]) => {
         impl $TypeName {
-            all_fn!($DataType);
-            get_set_fn!($DataType, $f0, 0);
-            get_set_fn!($DataType, $f1, 1);
-            get_set_fn!($DataType, $f2, 2);
-            get_set_fn!($DataType, $f3, 3);
-            get_set_fn!($DataType, $f4, 4);
-            get_set_fn!($DataType, $f5, 5);
-            get_set_fn!($DataType, $f6, 6);
+            bf_acf!($DataType);
+            bf_gsf!($DataType, $f0, 0);
+            bf_gsf!($DataType, $f1, 1);
+            bf_gsf!($DataType, $f2, 2);
+            bf_gsf!($DataType, $f3, 3);
+            bf_gsf!($DataType, $f4, 4);
+            bf_gsf!($DataType, $f5, 5);
+            bf_gsf!($DataType, $f6, 6);
         }
     };
     ($TypeName:ident, $DataType:ty, [$f0:ident, $f1:ident, $f2:ident, $f3:ident, $f4:ident, $f5:ident, $f6:ident, $f7:ident]) => {
         impl $TypeName {
-            all_fn!($DataType);
-            get_set_fn!($DataType, $f0, 0);
-            get_set_fn!($DataType, $f1, 1);
-            get_set_fn!($DataType, $f2, 2);
-            get_set_fn!($DataType, $f3, 3);
-            get_set_fn!($DataType, $f4, 4);
-            get_set_fn!($DataType, $f5, 5);
-            get_set_fn!($DataType, $f6, 6);
-            get_set_fn!($DataType, $f7, 7);
+            bf_acf!($DataType);
+            bf_gsf!($DataType, $f0, 0);
+            bf_gsf!($DataType, $f1, 1);
+            bf_gsf!($DataType, $f2, 2);
+            bf_gsf!($DataType, $f3, 3);
+            bf_gsf!($DataType, $f4, 4);
+            bf_gsf!($DataType, $f5, 5);
+            bf_gsf!($DataType, $f6, 6);
+            bf_gsf!($DataType, $f7, 7);
         }
     };
 }
 
+/// Define the sets of BitFields with Type.
 #[macro_export]
-macro_rules! bitfeilds {
+macro_rules! bf {
     ($TypeName:ident($DataType:ty), {$f0:tt:$w0:expr, $f1:tt:$w1:expr}) => {
-        decl_type!($TypeName, $DataType);
-        impl_fields!($TypeName, [$w0, $w1]);
-        impl_getter_setter!($TypeName, $DataType, [$f0, $f1]);
+        bf_type!($TypeName, $DataType);
+        bf_cfa!($TypeName, [$w0, $w1]);
+        bf_ff!($TypeName);
+        bf_impl!($TypeName, $DataType, [$f0, $f1]);
     };
     ($TypeName:ident($DataType:ty), {$f0:ident:$w0:expr, $f1:ident:$w1:expr, $f2:ident:$w2:expr}) => {
-        decl_type!($TypeName, $DataType);
-        impl_fields!($TypeName, [$w0, $w1, $w2]);
-        impl_getter_setter!($TypeName, $DataType, [$f0, $f1, $f2]);
+        bf_type!($TypeName, $DataType);
+        bf_cfa!($TypeName, [$w0, $w1, $w2]);
+        bf_ff!($TypeName);
+        bf_impl!($TypeName, $DataType, [$f0, $f1, $f2]);
     };
     ($TypeName:ident($DataType:ty), {$f0:ident:$w0:expr, $f1:ident:$w1:expr, $f2:ident:$w2:expr, $f3:ident:$w3:expr}) => {
-        decl_type!($TypeName, $DataType);
-        impl_fields!($TypeName, [$w0, $w1, $w2, $w3]);
-        impl_getter_setter!($TypeName, $DataType, [$f0, $f1, $f2, $f3]);
+        bf_type!($TypeName, $DataType);
+        bf_cfa!($TypeName, [$w0, $w1, $w2, $w3]);
+        bf_ff!($TypeName);
+        bf_impl!($TypeName, $DataType, [$f0, $f1, $f2, $f3]);
     };
     ($TypeName:ident($DataType:ty), {$f0:ident:$w0:expr, $f1:ident:$w1:expr, $f2:ident:$w2:expr, $f3:ident:$w3:expr, $f4:ident:$w4:expr}) => {
-        decl_type!($TypeName, $DataType);
-        impl_fields!($TypeName, [$w0, $w1, $w2, $w3, $w4]);
-        impl_getter_setter!($TypeName, $DataType, [$f0, $f1, $f2, $f3, $f4]);
+        bf_type!($TypeName, $DataType);
+        bf_cfa!($TypeName, [$w0, $w1, $w2, $w3, $w4]);
+        bf_ff!($TypeName);
+        bf_impl!($TypeName, $DataType, [$f0, $f1, $f2, $f3, $f4]);
     };
     ($TypeName:ident($DataType:ty), {$f0:ident:$w0:expr, $f1:ident:$w1:expr, $f2:ident:$w2:expr, $f3:ident:$w3:expr, $f4:ident:$w4:expr, $f5:ident:$w5:expr}) => {
-        decl_type!($TypeName, $DataType);
-        impl_fields!($TypeName, [$w0, $w1, $w2, $w3, $w4, $w5]);
-        impl_getter_setter!($TypeName, $DataType, [$f0, $f1, $f2, $f3, $f4, $f5]);
+        bf_type!($TypeName, $DataType);
+        bf_cfa!($TypeName, [$w0, $w1, $w2, $w3, $w4, $w5]);
+        bf_ff!($TypeName);
+        bf_impl!($TypeName, $DataType, [$f0, $f1, $f2, $f3, $f4, $f5]);
     };
     ($TypeName:ident($DataType:ty), {$f0:ident:$w0:expr, $f1:ident:$w1:expr, $f2:ident:$w2:expr, $f3:ident:$w3:expr, $f4:ident:$w4:expr, $f5:ident:$w5:expr, $f6:ident:$w6:expr}) => {
-        decl_type!($TypeName, $DataType);
-        impl_fields!($TypeName, [$w0, $w1, $w2, $w3, $w4, $w5, $f6]);
-        impl_getter_setter!($TypeName, $DataType, [$f0, $f1, $f2, $f3, $f4, $f5, $f6]);
+        bf_type!($TypeName, $DataType);
+        bf_cfa!($TypeName, [$w0, $w1, $w2, $w3, $w4, $w5, $w6]);
+        bf_ff!($TypeName);
+        bf_impl!($TypeName, $DataType, [$f0, $f1, $f2, $f3, $f4, $f5, $f6]);
     };
     ($TypeName:ident($DataType:ty), {$f0:ident:$w0:expr, $f1:ident:$w1:expr, $f2:ident:$w2:expr, $f3:ident:$w3:expr, $f4:ident:$w4:expr, $f5:ident:$w5:expr, $f6:ident:$w6:expr, $f7:ident:$w7:expr}) => {
-        decl_type!($TypeName, $DataType);
-        impl_fields!($TypeName, [$w0, $w1, $w2, $w3, $w4, $w5, $f6]);
-        impl_getter_setter!(
+        bf_type!($TypeName, $DataType);
+        bf_cfa!($TypeName, [$w0, $w1, $w2, $w3, $w4, $w5, $w6, $w7]);
+        bf_ff!($TypeName);
+        bf_impl!(
             $TypeName,
             $DataType,
             [$f0, $f1, $f2, $f3, $f4, $f5, $f6, $f7]
@@ -349,7 +370,6 @@ mod tests {
 
     #[test]
     fn test_bitfield_mask_u8() {
-        let a = (1 << 1) - 1;
         assert_eq!(0x01 << 0, BitField(1, 0).mask_u8());
         assert_eq!(0x03 << 0, BitField(2, 0).mask_u8());
         assert_eq!(0x07 << 0, BitField(3, 0).mask_u8());
@@ -362,7 +382,7 @@ mod tests {
     }
 
     // u8
-    bitfeilds!(Bi8_1232(u8), { a:1, b: 2, c:3, d:2 });
+    bf!(Bi8_1232(u8), { a:1, b: 2, c:3, d:2 });
 
     #[test]
     fn test_bitfield_u8() {
@@ -391,7 +411,7 @@ mod tests {
     }
 
     // u16
-    bitfeilds!(Bi16_123451(u16), { a:1, b:2, c:3, d:4, e:5, f:1 });
+    bf!(Bi16_123451(u16), { a:1, b:2, c:3, d:4, e:5, f:1 });
 
     #[test]
     fn test_bitfield_u16() {
