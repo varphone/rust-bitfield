@@ -1,10 +1,18 @@
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
 
-use bitfield::*;
+use bitfield::{bitfield_fields, BitRange, Bits};
 
 // Define a BitField Type with 2 fields.
-bf!(tV56aIEy_Bi1(u16), {IEDZ:10, _rb_:6});
+#[derive(Copy, Clone, Debug, Default)]
+struct tV56aIEy_Bi1(u16);
+
+impl tV56aIEy_Bi1 {
+    bitfield_fields! {
+        IEDZ, set_IEDZ : u16 [9..0];
+        _rb_, set__rb_ : u16 [15..10];
+    }
+}
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Default)]
@@ -20,7 +28,6 @@ fn main() {
     let mut a = tV56aIEy::default();
     assert_eq!(6, std::mem::size_of::<tV56aIEy>());
     println!("{:?}", a);
-    a.bi1.fill(0x55AA);
     println!("{:?}", a);
     println!("IEDZ = {}, _rb_ = {}", a.bi1.IEDZ(), a.bi1._rb_());
     println!("{:?}", a);
@@ -30,10 +37,8 @@ fn main() {
         a.bi1._rb_()
     );
     println!("{:?}", a);
-    a.bi1.clear();
     println!("IEDZ = {}, _rb_ = {}", a.bi1.IEDZ(), a.bi1._rb_());
     println!("{:?}", a);
-    a.bi1.fill(0xffff);
     println!("IEDZ = {}, _rb_ = {}", a.bi1.IEDZ(), a.bi1._rb_());
     println!("{:?}", a);
 }
