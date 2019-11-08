@@ -8,6 +8,7 @@ This crate provides macros to generate bitfield-like struct.
 repository = "https://github.com/varphone/rust-bitfield"
 documentation = "https://docs.rs/rust-bitfield"
 license = "MIT"
+edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

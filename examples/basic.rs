@@ -1,7 +1,7 @@
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
 
-use bitfield::{bitfield_fields, BitRange, Bits};
+use rust_bitfield::{bitfield_fields, BitRange, Bits};
 
 // Define a BitField Type with 2 fields.
 #[derive(Copy, Clone, Debug, Default)]

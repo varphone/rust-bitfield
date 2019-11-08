@@ -150,12 +150,6 @@ macro_rules! bitfield_fields {
             self.$slot
         }
     };
-    (@getter ($(#[$attribute:meta])*) ($($vis:tt)*) $getter:tt : $sty:tt [] in $slot:tt) => {
-        $(#[$attribute])*
-        $($vis)* fn $getter(&self) -> $sty {
-            self.$slot
-        }
-    };
     // Return msb bit as bool.
     (@field ($(#[$attribute:meta])*) ($($vis:tt)*) $getter:tt, _ : $sty:tt [$msb:tt..$lsb:tt] in $slot:tt as bool) => {
         $(#[$attribute])*
@@ -172,13 +166,6 @@ macro_rules! bitfield_fields {
     };
     // Set all bits with T.
     (@field ($(#[$attribute:meta])*) ($($vis:tt)*) _, $setter:tt : $sty:tt [] in $slot:tt) => {
-        $(#[$attribute])*
-        $($vis)* fn $setter(&mut self, value: $sty) -> &mut Self {
-            self.$slot = value;
-            self
-        }
-    };
-    (@setter ($(#[$attribute:meta])*) ($($vis:tt)*) $setter:tt : $sty:tt [] in $slot:tt) => {
         $(#[$attribute])*
         $($vis)* fn $setter(&mut self, value: $sty) -> &mut Self {
             self.$slot = value;
@@ -206,68 +193,113 @@ macro_rules! bitfield_fields {
         }
     };
     // Match: pub? <getter>,<setter> : <T> []
-    ($(#[$attribute:meta])* $vis:vis $getter:ident, $setter:ident : $sty:tt []; $($rest:tt)*) => {
-        bitfield_fields!{ @field ($(#[$attribute])*) ($vis) $getter, _ : $sty [] in 0 }
-        bitfield_fields!{ @field ($(#[$attribute])*) ($vis) _, $setter : $sty [] in 0 }
+    (($(#[$attribute:meta])*) $getter:tt, $setter:tt : $sty:tt []; $($rest:tt)*) => {
+        bitfield_fields!{ @field ($(#[$attribute])*) () $getter, _ : $sty [] in 0 }
+        bitfield_fields!{ @field ($(#[$attribute])*) () _, $setter : $sty [] in 0 }
+        bitfield_fields!{ $($rest)* }
+    };
+    ($(#[$attribute:meta])* pub $getter:tt, $setter:tt : $sty:tt []; $($rest:tt)*) => {
+        bitfield_fields!{ @field ($(#[$attribute])*) (pub) $getter, _ : $sty [] in 0 }
+        bitfield_fields!{ @field ($(#[$attribute])*) (pub) _, $setter : $sty [] in 0 }
         bitfield_fields!{ $($rest)* }
     };
     // Match: pub? <getter>,<setter> : <T> [] in <slot>
-    ($(#[$attribute:meta])* $vis:vis $getter:ident, _ : $sty:tt [] in $slot:tt; $($rest:tt)*) => {
-        bitfield_fields!{ @getter ($(#[$attribute])*) ($vis) $getter : $sty [] in $slot }
-        //bitfield_fields!{ @field ($(#[$attribute])*) () _, $setter : $sty [] in $slot }
+    ($(#[$attribute:meta])* $getter:tt, $setter:tt : $sty:tt [] in $slot:tt; $($rest:tt)*) => {
+        bitfield_fields!{ @field ($(#[$attribute])*) () $getter, _ : $sty [] in $slot }
+        bitfield_fields!{ @field ($(#[$attribute])*) () _, $setter : $sty [] in $slot }
         bitfield_fields!{ $($rest)* }
     };
-    ($(#[$attribute:meta])* $vis:vis _, $setter:ident : $sty:tt [] in $slot:tt; $($rest:tt)*) => {
-        //bitfield_fields!{ @field ($(#[$attribute])*) ($vis) $getter, _ : $sty [] in $slot }
-        bitfield_fields!{ @setter ($(#[$attribute])*) ($vis) $setter : $sty [] in $slot }
+    ($(#[$attribute:meta])* pub $getter:tt, $setter:tt : $sty:tt [] in $slot:tt; $($rest:tt)*) => {
+        bitfield_fields!{ @field ($(#[$attribute])*) (pub) $getter, _ : $sty [] in $slot }
+        bitfield_fields!{ @field ($(#[$attribute])*) (pub) _, $setter : $sty [] in $slot }
         bitfield_fields!{ $($rest)* }
     };
     // Match: pub? <getter>,<setter> : <T> [<msb>]
-    ($(#[$attribute:meta])* $vis:vis $getter:ident, $setter:ident : $sty:tt [$msb:tt]; $($rest:tt)*) => {
-        bitfield_fields!{ @field ($(#[$attribute])*) ($vis) $getter, _ : $sty [$msb..$msb] in 0 as $sty }
-        bitfield_fields!{ @field ($(#[$attribute])*) ($vis) _, $setter : $sty [$msb..$msb] in 0 as $sty }
+    ($(#[$attribute:meta])* $getter:tt, $setter:tt : $sty:tt [$msb:tt]; $($rest:tt)*) => {
+        bitfield_fields!{ @field ($(#[$attribute])*) () $getter, _ : $sty [$msb..$msb] in 0 as $sty }
+        bitfield_fields!{ @field ($(#[$attribute])*) () _, $setter : $sty [$msb..$msb] in 0 as $sty }
+        bitfield_fields!{ $($rest)* }
+    };
+    ($(#[$attribute:meta])* pub $getter:tt, $setter:tt : $sty:tt [$msb:tt]; $($rest:tt)*) => {
+        bitfield_fields!{ @field ($(#[$attribute])*) (pub) $getter, _ : $sty [$msb..$msb] in 0 as $sty }
+        bitfield_fields!{ @field ($(#[$attribute])*) (pub) _, $setter : $sty [$msb..$msb] in 0 as $sty }
         bitfield_fields!{ $($rest)* }
     };
     // Match: pub? <getter>,<setter> : <T> [<msb>] in <slot>
-    ($(#[$attribute:meta])* $vis:vis $getter:ident, $setter:ident : $sty:tt [$msb:tt] in $slot:tt; $($rest:tt)*) => {
-        bitfield_fields!{ @field ($(#[$attribute])*) ($vis) $getter, _ : $sty [$msb..$msb] in $slot as $sty }
-        bitfield_fields!{ @field ($(#[$attribute])*) ($vis) _, $setter : $sty [$msb..$msb] in $slot as $sty }
+    ($(#[$attribute:meta])* $getter:tt, $setter:tt : $sty:tt [$msb:tt] in $slot:tt; $($rest:tt)*) => {
+        bitfield_fields!{ @field ($(#[$attribute])*) () $getter, _ : $sty [$msb..$msb] in $slot as $sty }
+        bitfield_fields!{ @field ($(#[$attribute])*) () _, $setter : $sty [$msb..$msb] in $slot as $sty }
+        bitfield_fields!{ $($rest)* }
+    };
+    ($(#[$attribute:meta])* pub $getter:tt, $setter:tt : $sty:tt [$msb:tt] in $slot:tt; $($rest:tt)*) => {
+        bitfield_fields!{ @field ($(#[$attribute])*) (pub) $getter, _ : $sty [$msb..$msb] in $slot as $sty }
+        bitfield_fields!{ @field ($(#[$attribute])*) (pub) _, $setter : $sty [$msb..$msb] in $slot as $sty }
         bitfield_fields!{ $($rest)* }
     };
     // Match: pub? <getter>,<setter> : <T> [<msb>] as <U>
-    ($(#[$attribute:meta])* $vis:vis $getter:ident, $setter:ident : $sty:tt [$msb:tt] as $vty:tt; $($rest:tt)*) => {
-        bitfield_fields!{ @field ($(#[$attribute])*) ($vis) $getter, _ : $sty [$msb..$msb] in 0 as $vty }
-        bitfield_fields!{ @field ($(#[$attribute])*) ($vis) _, $setter : $sty [$msb..$msb] in 0 as $vty }
+    ($(#[$attribute:meta])* $getter:tt, $setter:tt : $sty:tt [$msb:tt] as $vty:tt; $($rest:tt)*) => {
+        bitfield_fields!{ @field ($(#[$attribute])*) () $getter, _ : $sty [$msb..$msb] in 0 as $vty }
+        bitfield_fields!{ @field ($(#[$attribute])*) () _, $setter : $sty [$msb..$msb] in 0 as $vty }
+        bitfield_fields!{ $($rest)* }
+    };
+    ($(#[$attribute:meta])* pub $getter:tt, $setter:tt : $sty:tt [$msb:tt] as $vty:tt; $($rest:tt)*) => {
+        bitfield_fields!{ @field ($(#[$attribute])*) (pub) $getter, _ : $sty [$msb..$msb] in 0 as $vty }
+        bitfield_fields!{ @field ($(#[$attribute])*) (pub) _, $setter : $sty [$msb..$msb] in 0 as $vty }
         bitfield_fields!{ $($rest)* }
     };
     // Match: pub? <getter>,<setter> : <T> [<msb>] in <slot> as <U>
-    ($(#[$attribute:meta])* $vis:vis $getter:ident, $setter:ident : $sty:tt [$msb:tt] in $slot:tt as $vty:tt; $($rest:tt)*) => {
-        bitfield_fields!{ @field ($(#[$attribute])*) ($vis) $getter, _ : $sty [$msb..$msb] in $slot as $vty }
-        bitfield_fields!{ @field ($(#[$attribute])*) ($vis) _, $setter : $sty [$msb..$msb] in $slot as $vty }
+    ($(#[$attribute:meta])* $getter:tt, $setter:tt : $sty:tt [$msb:tt] in $slot:tt as $vty:tt; $($rest:tt)*) => {
+        bitfield_fields!{ @field ($(#[$attribute])*) () $getter, _ : $sty [$msb..$msb] in $slot as $vty }
+        bitfield_fields!{ @field ($(#[$attribute])*) () _, $setter : $sty [$msb..$msb] in $slot as $vty }
+        bitfield_fields!{ $($rest)* }
+    };
+    ($(#[$attribute:meta])* pub $getter:tt, $setter:tt : $sty:tt [$msb:tt] in $slot:tt as $vty:tt; $($rest:tt)*) => {
+        bitfield_fields!{ @field ($(#[$attribute])*) (pub) $getter, _ : $sty [$msb..$msb] in $slot as $vty }
+        bitfield_fields!{ @field ($(#[$attribute])*) (pub) _, $setter : $sty [$msb..$msb] in $slot as $vty }
         bitfield_fields!{ $($rest)* }
     };
     // Match: pub? <getter>,<setter> : <T> [<msb>..<lsb>]
-    ($(#[$attribute:meta])* $vis:vis $getter:ident, $setter:ident : $sty:tt [$msb:tt..$lsb:tt]; $($rest:tt)*) => {
-        bitfield_fields!{ @field ($(#[$attribute])*) ($vis) $getter, _ : $sty [$msb..$lsb] in 0 as $sty }
-        bitfield_fields!{ @field ($(#[$attribute])*) ($vis) _, ($setter) : $sty [$msb..$lsb] in 0 as $sty }
+    ($(#[$attribute:meta])* $getter:tt, $setter:tt : $sty:tt [$msb:tt..$lsb:tt]; $($rest:tt)*) => {
+        bitfield_fields!{ @field ($(#[$attribute])*) () $getter, _ : $sty [$msb..$lsb] in 0 as $sty }
+        bitfield_fields!{ @field ($(#[$attribute])*) () _, $setter : $sty [$msb..$lsb] in 0 as $sty }
+        bitfield_fields!{ $($rest)* }
+    };
+    ($(#[$attribute:meta])* pub $getter:tt, $setter:tt : $sty:tt [$msb:tt..$lsb:tt]; $($rest:tt)*) => {
+        bitfield_fields!{ @field ($(#[$attribute])*) (pub) $getter, _ : $sty [$msb..$lsb] in 0 as $sty }
+        bitfield_fields!{ @field ($(#[$attribute])*) (pub) _, $setter : $sty [$msb..$lsb] in 0 as $sty }
         bitfield_fields!{ $($rest)* }
     };
     // Match: pub? <getter>,<setter> : <T> [<msb>..<lsb>] in <slot>
-    ($(#[$attribute:meta])* $vis:vis $getter:ident, $setter:ident : $sty:tt [$msb:tt..$lsb:tt] in $slot:tt; $($rest:tt)*) => {
-        bitfield_fields!{ @field ($(#[$attribute])*) ($vis) $getter, _ : $sty [$msb..$lsb] in $slot as $sty }
-        bitfield_fields!{ @field ($(#[$attribute])*) ($vis) _, $setter : $sty [$msb..$lsb] in $slot as $sty }
+    ($(#[$attribute:meta])* $getter:tt, $setter:tt : $sty:tt [$msb:tt..$lsb:tt] in $slot:tt; $($rest:tt)*) => {
+        bitfield_fields!{ @field ($(#[$attribute])*) () $getter, _ : $sty [$msb..$lsb] in $slot as $sty }
+        bitfield_fields!{ @field ($(#[$attribute])*) () _, $setter : $sty [$msb..$lsb] in $slot as $sty }
+        bitfield_fields!{ $($rest)* }
+    };
+    ($(#[$attribute:meta])* pub $getter:tt, $setter:tt : $sty:tt [$msb:tt..$lsb:tt] in $slot:tt; $($rest:tt)*) => {
+        bitfield_fields!{ @field ($(#[$attribute])*) (pub) $getter, _ : $sty [$msb..$lsb] in $slot as $sty }
+        bitfield_fields!{ @field ($(#[$attribute])*) (pub) _, $setter : $sty [$msb..$lsb] in $slot as $sty }
         bitfield_fields!{ $($rest)* }
     };
     // Match: pub? <getter>,<setter> : <T> [<msb>..<lsb>] as <U>
-    ($(#[$attribute:meta])* $vis:vis $getter:ident, $setter:ident : $sty:tt [$msb:tt..$lsb:tt] as $vty:tt; $($rest:tt)*) => {
-        bitfield_fields!{ @field ($(#[$attribute])*) ($vis) $getter, _ : $sty [$msb..$lsb] in 0 as $vty }
-        bitfield_fields!{ @field ($(#[$attribute])*) ($vis) _, $setter : $sty [$msb..$lsb] in 0 as $vty }
+    ($(#[$attribute:meta])* $getter:tt, $setter:tt : $sty:tt [$msb:tt..$lsb:tt] as $vty:tt; $($rest:tt)*) => {
+        bitfield_fields!{ @field ($(#[$attribute])*) () $getter, _ : $sty [$msb..$lsb] in 0 as $vty }
+        bitfield_fields!{ @field ($(#[$attribute])*) () _, $setter : $sty [$msb..$lsb] in 0 as $vty }
+        bitfield_fields!{ $($rest)* }
+    };
+    ($(#[$attribute:meta])* pub $getter:tt, $setter:tt : $sty:tt [$msb:tt..$lsb:tt] as $vty:tt; $($rest:tt)*) => {
+        bitfield_fields!{ @field ($(#[$attribute])*) (pub) $getter, _ : $sty [$msb..$lsb] in 0 as $vty }
+        bitfield_fields!{ @field ($(#[$attribute])*) (pub) _, $setter : $sty [$msb..$lsb] in 0 as $vty }
         bitfield_fields!{ $($rest)* }
     };
     // Match: pub? <getter>,<setter> : <T> [<msb>..<lsb>] in <slot> as <U>
-    ($(#[$attribute:meta])* $vis:vis $getter:ident, $setter:ident : $sty:tt [$msb:tt..$lsb:tt] in $slot:tt as $vty:tt; $($rest:tt)*) => {
-        bitfield_fields!{ @field ($(#[$attribute])*) ($vis) $getter, _ : $sty [$msb..$lsb] in $slot as $vty }
-        bitfield_fields!{ @field ($(#[$attribute])*) ($vis) _, $setter : $sty [$msb..$lsb] in $slot as $vty }
+    ($(#[$attribute:meta])* $getter:tt, $setter:tt : $sty:tt [$msb:tt..$lsb:tt] in $slot:tt as $vty:tt; $($rest:tt)*) => {
+        bitfield_fields!{ @field ($(#[$attribute])*) () $getter, _ : $sty [$msb..$lsb] in $slot as $vty }
+        bitfield_fields!{ @field ($(#[$attribute])*) () _, $setter : $sty [$msb..$lsb] in $slot as $vty }
+        bitfield_fields!{ $($rest)* }
+    };
+    ($(#[$attribute:meta])* pub $getter:tt, $setter:tt : $sty:tt [$msb:tt..$lsb:tt] in $slot:tt as $vty:tt; $($rest:tt)*) => {
+        bitfield_fields!{ @field ($(#[$attribute])*) (pub) $getter, _ : $sty [$msb..$lsb] in $slot as $vty }
+        bitfield_fields!{ @field ($(#[$attribute])*) (pub) _, $setter : $sty [$msb..$lsb] in $slot as $vty }
         bitfield_fields!{ $($rest)* }
     };
 }
@@ -310,7 +342,6 @@ mod tests {
             pub all3, _ : u32 [] in 2;
             // u64
             rsv, _ : u64 [] in 3;
-            _, set_rsv: u64 [] in 3;
         }
     }
 
